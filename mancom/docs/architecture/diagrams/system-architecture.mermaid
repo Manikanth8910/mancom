@@ -1,0 +1,78 @@
+%% Mancom System Architecture
+
+%% High-Level Architecture
+graph TB
+    subgraph Clients
+        MA[Mobile App]
+        WA[Web App]
+        AP[Admin Portal]
+    end
+
+    subgraph Gateway["API Gateway (Future)"]
+        GW[Kong/Nginx]
+    end
+
+    subgraph Services
+        AS[Auth Service<br/>:3001]
+        VS[Visitor Service<br/>:3002]
+        SS[Society Service<br/>:3003]
+        NS[Notification Service<br/>:3004]
+    end
+
+    subgraph Data
+        PG[(PostgreSQL)]
+        RD[(Redis)]
+    end
+
+    subgraph External
+        AW[Appwrite]
+    end
+
+    MA --> GW
+    WA --> GW
+    AP --> GW
+
+    GW --> AS
+    GW --> VS
+    GW --> SS
+    GW --> NS
+
+    AS --> AW
+    AS --> RD
+
+    VS --> PG
+    SS --> PG
+    NS --> RD
+
+%% Authentication Flow
+sequenceDiagram
+    participant C as Client
+    participant A as Appwrite
+    participant AS as Auth Service
+    participant S as Other Service
+
+    C->>A: Login (OTP/Email/OAuth)
+    A-->>C: Appwrite JWT
+
+    C->>AS: POST /auth/token {appwriteJwt}
+    AS->>A: Verify JWT
+    A-->>AS: User data
+    AS-->>C: {accessToken, refreshToken}
+
+    C->>S: API Request + accessToken
+    Note over S: Verify JWT with public key
+    S-->>C: Response
+
+%% Token Refresh Flow
+sequenceDiagram
+    participant C as Client
+    participant AS as Auth Service
+    participant R as Redis
+
+    C->>AS: POST /auth/refresh {refreshToken}
+    AS->>AS: Verify refresh token
+    AS->>R: Check token not revoked
+    R-->>AS: Valid
+    AS->>R: Revoke old token
+    AS->>R: Store new token
+    AS-->>C: New token pair

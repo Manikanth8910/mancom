@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  phone     String?
+  role      String   @default("USER") // USER, ADMIN, SECURITY, SUPERADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Parking legacy fields
+  memberId   String?
+  department String?
+  flatNumber String?
+  blockNumber String?
+  userType   String?
+
+  profileImage String?
+  
+  flatId    String?
+  flat      Flat?    @relation(fields: [flatId], references: [id])
+  
+  societyId String?
+  society   Society? @relation(fields: [societyId], references: [id])
+  
+  vehicles  Vehicle[]
+  visitors  VisitorLog[]
+  parkingVehicles ParkingVehicle[]
+  notifications   Notification[]
+  amenityBookings AmenityBooking[]
+  createdPasses   VisitorPass[]   @relation("CreatedPasses")
+  
+  entryScans      ParkingSession[] @relation("EntryScans")
+  exitScans       ParkingSession[] @relation("ExitScans")
+  qrCodes         ParkingQRCode[]
+  violations      ViolationLog[]
+}
+
+model Society {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flats     Flat[]
+  users     User[]
+  visitorLogs VisitorLog[]
+  visitorPasses VisitorPass[]
+  amenities   Amenity[]
+}
+
+model Flat {
+  id        String   @id @default(uuid())
+  number    String
+  building  String?
+  societyId String
+  society   Society  @relation(fields: [societyId], references: [id])
+  
+  users     User[]
+  vehicles  Vehicle[]
+  visitorLogs VisitorLog[]
+  visitorPasses VisitorPass[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Vehicle {
+  id        String   @id @default(uuid())
+  plate     String   @unique
+  type      String?  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  flatId    String
+  flat      Flat     @relation(fields: [flatId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model VisitorLog {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   
+  phone     String?
+  plate     String?
+  inTime    DateTime @default(now())
+  outTime   DateTime?
+  status    String   @default("Inside") 
+  
+  flatId    String
+  flat      Flat     @relation(fields: [flatId], references: [id])
+  societyId String
+  society   Society  @relation(fields: [societyId], references: [id])
+
+  approvedById String?
+  approvedBy User? @relation(fields: [approvedById], references: [id])
+}
+
+model Otp {
+  id           String    @id @default(uuid())
+  phone        String    @unique
+  otp          String
+  attempts     Int       @default(0)
+  blockedUntil DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+}
+
+// ─── Parking Service (PostgreSQL mirrors) ───────────────────────────────────
+
+model ParkingVehicle {
+  id             String   @id @default(uuid())
+  vehicleNumber  String   @unique
+  vehicleType    String   // car | bike
+  model          String?
+  color          String?
+  isEv           Boolean  @default(false)
+  ownerName      String
+  phoneNumber    String?
+  flatNumber     String?
+  blockNumber    String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sessions ParkingSession[]
+
+  @@map("parking_vehicles")
+}
+
+model ParkingSlot {
+  id         String   @id @default(uuid())
+  slotNumber String   @unique
+  type       String   // car | bike
+  isOccupied Boolean  @default(false)
+  isEv       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sessions ParkingSession[]
+
+  @@map("parking_slots")
+}
+
+model ParkingSession {
+  id              String    @id @default(uuid())
+  vehicleId       String
+  vehicle         ParkingVehicle @relation(fields: [vehicleId], references: [id])
+  slotId          String
+  slot            ParkingSlot    @relation(fields: [slotId], references: [id])
+  entryTime       DateTime  @default(now())
+  exitTime        DateTime?
+  fee             Float?
+  status          String    @default("active") // active | completed
+  
+  scannedByEntryId String?
+  scannedByEntry   User?    @relation("EntryScans", fields: [scannedByEntryId], references: [id])
+  
+  scannedByExitId  String?
+  scannedByExit    User?    @relation("ExitScans", fields: [scannedByExitId], references: [id])
+
+  @@map("parking_sessions")
+}
+
+model ParkingQRCode {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  expiryTime  DateTime
+  status      String    @default("ACTIVE") // ACTIVE | USED | EXPIRED
+  codeData    String?   // JSON data
+  createdAt   DateTime @default(now())
+
+  @@map("parking_qr_codes")
+}
+
+model ViolationLog {
+  id             String   @id @default(uuid())
+  securityUserId String?
+  securityUser   User?    @relation(fields: [securityUserId], references: [id])
+  vehicleNumber  String
+  ownerName      String?
+  phoneNumber    String?
+  issueType      String?
+  messageSent    String?
+  imageUrl       String?
+  status         String   @default("sent")
+  createdAt      DateTime @default(now())
+
+  @@map("violation_logs")
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("system_settings")
+}
+
+// ─── Visitor Pre-approval ───────────────────────────────────────────────────
+
+model VisitorPass {
+  id             String    @id @default(uuid())
+  visitorName    String
+  visitorPhone   String?
+  purpose        String?
+  expectedAt     DateTime?
+  token          String    @unique @default(uuid())
+  status         String    @default("pending") // pending | arrived | expired | cancelled
+  flatId         String?
+  flat           Flat?     @relation(fields: [flatId], references: [id])
+  societyId      String?
+  society        Society?  @relation(fields: [societyId], references: [id])
+  createdById    String
+  createdBy      User      @relation("CreatedPasses", fields: [createdById], references: [id])
+  scannedAt      DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@map("visitor_passes")
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  body      String
+  type      String   // visitor | parking | announcement | helpdesk
+  isRead    Boolean  @default(false)
+  data      String?  // JSON metadata
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// ─── Amenity Booking ────────────────────────────────────────────────────────
+
+model Amenity {
+  id          String   @id @default(uuid())
+  name        String
+  icon        String?
+  description String?
+  societyId   String
+  society     Society  @relation(fields: [societyId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  slots AmenitySlot[]
+
+  @@map("amenities")
+}
+
+model AmenitySlot {
+  id        String   @id @default(uuid())
+  amenityId String
+  amenity   Amenity  @relation(fields: [amenityId], references: [id])
+  date      DateTime
+  startTime String   // "09:00"
+  endTime   String   // "10:00"
+  maxCapacity Int    @default(1)
+  createdAt DateTime @default(now())
+
+  bookings AmenityBooking[]
+
+  @@map("amenity_slots")
+}
+
+model AmenityBooking {
+  id        String   @id @default(uuid())
+  slotId    String
+  slot      AmenitySlot @relation(fields: [slotId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  status    String   @default("confirmed") // confirmed | cancelled
+  createdAt DateTime @default(now())
+
+  @@map("amenity_bookings")
+}

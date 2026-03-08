@@ -1,0 +1,22 @@
+# Mancom Backend Code Owners
+# These owners will be requested for review on PRs that modify matching files.
+
+# Default owners for everything
+* @mancom/backend-team
+
+# Package owners
+/packages/common/ @mancom/backend-team
+/packages/jwt-utils/ @mancom/backend-team
+
+# Service owners
+/services/auth-service/ @mancom/backend-team
+/services/visitor-service/ @mancom/backend-team
+
+# Documentation
+/docs/ @mancom/backend-team
+/guides/ @mancom/backend-team
+
+# CI/CD and infrastructure
+/.github/ @mancom/devops-team
+/docker/ @mancom/devops-team
+Makefile @mancom/devops-team
