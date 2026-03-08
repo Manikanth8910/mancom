@@ -1,0 +1,25 @@
+# Code Owners
+# These users will be automatically requested for review
+
+# Default owners for everything
+* @mancom-team
+
+# Frontend specific
+/src/ @frontend-team
+
+# Navigation changes need extra review
+/src/navigation/ @frontend-lead @frontend-team
+
+# Store/Redux changes need extra review
+/src/store/ @frontend-lead @frontend-team
+
+# API and auth changes need extra review
+/src/core/api/ @backend-team @frontend-lead
+/src/services/ @backend-team @frontend-lead
+
+# Documentation
+/docs/ @tech-writers @frontend-team
+/guides/ @tech-writers @frontend-team
+
+# CI/CD configuration
+/.github/ @devops-team
