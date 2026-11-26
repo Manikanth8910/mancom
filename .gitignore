@@ -31,3 +31,11 @@ keys/
 # Logs
 logs/
 *.log
+
+# Databases
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-journal
